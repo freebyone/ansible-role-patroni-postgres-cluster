@@ -3,7 +3,7 @@ galaxy_info:
   description: Patroni PostgreSQL with Spilo
   license: MIT
   min_ansible_version: "2.9"
-  role_name: etcd
+  role_name: patroni_postgres
   platforms:
     - name: Ubuntu
       versions:
