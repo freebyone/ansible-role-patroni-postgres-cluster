@@ -19,11 +19,10 @@ ExecStart=/usr/bin/docker run \
   --network host \
   --privileged \
   --volume {{ patroni_base_dir }}:{{ patroni_base_dir }} \
-  --volume {{ patroni_config_dir }}/patroni.yml:/home/postgres/postgres.yml \
+  --volume {{ patroni_config_dir }}/patroni.yml:{{ patroni_home_dir }} \
   --log-driver=journald \
   --log-opt tag="{{ patroni_cluster_name }}" \
   -e ETCD3_HOSTS="{{ etcd_servers }}" \
-  -e PGBOUNCER_CONFIGURATION= "{{ pgbouncer_config_dir }}/pgbouncer.ini" \
   {{ patroni_docker_image }}
 
 ExecStop=/usr/bin/docker stop {{ patroni_cluster_name }}

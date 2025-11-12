@@ -1,28 +1,28 @@
 ---
 - name: Create postgres group
   group:
-    name: postgres
+    name: "{{ patroni_postgres_group }}"
     state: present
     system: yes
   become: true
 
 - name: Create secure postgres user
   user:
-    name: postgres
-    group: postgres
+    name: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
     home: "{{ postgres_home_dir }}"
     shell: /bin/false
     system: yes
     create_home: yes
-    comment: "PostgreSQL database server"
+    comment: "patroni-postgres database server"
   become: true
 
 - name: Create data directory with strict permissions
   file:
     path: "{{ patroni_base_dir }}"
     state: directory
-    owner: postgres
-    group: postgres
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
     mode: '0700'
   become: true
 
@@ -30,8 +30,8 @@
   file:
     path: "{{ item }}"
     state: directory
-    owner: postgres
-    group: postgres
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
     mode: '0755'
   become: true
   loop:
@@ -45,8 +45,8 @@
   template:
     src: patroni.yml.j2
     dest: "{{ patroni_config_dir }}/patroni.yml"
-    owner: postgres
-    group: postgres
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
     mode: '0644'
   become: true
 
@@ -59,7 +59,7 @@
   retries: 3
   delay: 5
 
-- name: Generate Patroni configuration as root
+- name: Generate Patroni configuration
   become: true
   template:
     src: patroni.yml.j2
@@ -71,8 +71,6 @@
   template:
     src: patroni.service.j2
     dest: "/etc/systemd/system/{{ patroni_cluster_name }}.service"
-    owner: root
-    group: root
     mode: '0644'
 
 - name: Reload systemd daemon
