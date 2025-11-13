@@ -68,3 +68,17 @@ postgresql_parameters:
 
 backup_retention_days: 30
 backup_schedule: "0 2 * * *"
+
+databases:
+  - name: app
+    owner: appuser
+    encoding: UTF8
+  - name: appdb
+    owner: postgres
+
+users:
+  - name: appuser
+    password: appuser
+    privileges:
+      - LOGIN
+      - CREATEDB

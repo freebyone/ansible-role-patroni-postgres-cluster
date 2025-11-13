@@ -21,8 +21,10 @@
     login_user: "postgres"
     login_password: "{{ postgres_superuser_password }}"
   loop: "{{ databases }}"
-  when: primary_node
-  tags: create_db
+  when: 
+    - primary_node
+    - management_postgres == true
+    - create_db ==true
 
 - name: Create users on primary
   community.postgresql.postgresql_user:
@@ -34,8 +36,10 @@
     login_user: "postgres" 
     login_password: "{{ postgres_superuser_password }}"
   loop: "{{ users }}"
-  when: primary_node
-  tags: create_user
+  when: 
+    - primary_node
+    - management_postgres == true
+    - create_db ==true
 
 - name: Create PgBouncer configuration
   template:
@@ -44,7 +48,11 @@
     owner: postgres
     group: postgres
     mode: '0640'
-  when: with_pgbouncer == true
+  when: 
+    - primary_node
+    - management_postgres == true
+    - create_db ==true
+    - with_pgbouncer == true
 
 - name: Create userlist file
   template:
@@ -53,4 +61,8 @@
     owner: postgres
     group: postgres
     mode: '0640'
-  when: with_pgbouncer == true
+  when: 
+    - primary_node
+    - management_postgres == true
+    - create_db ==true
+    - with_pgbouncer == true
