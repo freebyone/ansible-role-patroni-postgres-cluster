@@ -3,43 +3,51 @@
     url: "http://{{ ansible_host }}:{{ patroni_restapi_port }}/cluster"
     method: GET
   register: cluster_info
-  delegate_to: localhost
+  delegate_to: "{{ groups[patroni_cluster_name] | first }}"
   run_once: true
 
-- name: Find primary node
+- name: Get primary node name
   set_fact:
-    primary_node: "{{ inventory_hostname == (cluster_info.json.members | selectattr('role', 'match', '(master|leader)') | map(attribute='name') | first) }}"
+    primary_node_name: "{{ cluster_info.json.members | selectattr('role', 'match', '(master|leader)') | map(attribute='name') | first }}"
+  run_once: true
+  delegate_to: "{{ groups[patroni_cluster_name] | first }}"
+
+- name: Debug info
+  debug:
+    msg: "Primary node is: {{ primary_node_name }}"
   run_once: true
 
-- name: Create databases on primary
+- name: Create databases on primary node
   community.postgresql.postgresql_db:
     name: "{{ item.name }}"
     owner: "{{ item.owner | default(omit) }}"
     encoding: "{{ item.encoding | default('UTF8') }}"
     state: present
-    login_host: "{{ ansible_host }}"
+    login_host: "{{ hostvars[primary_node_name].ansible_host }}"
     login_user: "postgres"
     login_password: "{{ postgres_superuser_password }}"
   loop: "{{ databases }}"
   when: 
-    - primary_node
     - management_postgres | bool
     - create_db | bool
+  delegate_to: "{{ primary_node_name }}"
+  run_once: true
 
-- name: Create users on primary
+- name: Create users on primary node
   community.postgresql.postgresql_user:
     name: "{{ item.name }}"
     password: "{{ item.password }}"
     role_attr_flags: "{{ item.privileges | default(omit) | join(',') }}"
     state: present
-    login_host: "{{ ansible_host }}"
+    login_host: "{{ hostvars[primary_node_name].ansible_host }}"
     login_user: "postgres" 
     login_password: "{{ postgres_superuser_password }}"
   loop: "{{ users }}"
   when: 
-  - primary_node
-  - management_postgres | bool
-  - create_db | bool
+    - management_postgres | bool
+    - create_db | bool
+  delegate_to: "{{ primary_node_name }}"
+  run_once: true
 
 - name: Create PgBouncer configuration
   template:
