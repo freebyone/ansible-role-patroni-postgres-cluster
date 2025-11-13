@@ -4,6 +4,7 @@ new_cluster: false
 with_pgbouncer: false
 create_db: false
 backup_enabled: false
+with_backup: false
 
 patroni_base_dir: "/data/patroni-postgres-cluster"
 patroni_config_dir: "{{ patroni_base_dir }}/patroni"
@@ -65,8 +66,5 @@ postgresql_parameters:
   lock_timeout: "30000"
   statement_timeout: "60000"
 
-backup_method: "pgbackrest"
-backup_s3_bucket: "my-postgres-backups"
-backup_s3_region: "russia-central"
 backup_retention_days: 30
 backup_schedule: "0 2 * * *"

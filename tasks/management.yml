@@ -37,7 +37,7 @@
   when: primary_node
   tags: create_user
 
-- name: Create PgBouncer configuration in central directory
+- name: Create PgBouncer configuration
   template:
     src: pgbouncer.ini.j2
     dest: "{{ pgbouncer_config_dir }}/pgbouncer.ini"
@@ -46,7 +46,7 @@
     mode: '0640'
   when: with_pgbouncer == true
 
-- name: Create userlist file in central directory
+- name: Create userlist file
   template:
     src: userlist.txt.j2
     dest: "{{ pgbouncer_config_dir }}/userlist.txt"
