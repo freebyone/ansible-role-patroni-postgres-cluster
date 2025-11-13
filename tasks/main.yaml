@@ -12,7 +12,9 @@
 - name: Create databases with role and user in cluster
   become: true
   ansible.builtin.import_tasks: management.yml
-  when: flush_all != true and create_db == true
+  when: 
+    - flush_all != true 
+    - create_db | true
   tags: management-postgres
 
 - name: Backup postgres data

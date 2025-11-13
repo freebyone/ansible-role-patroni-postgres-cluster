@@ -23,8 +23,8 @@
   loop: "{{ databases }}"
   when: 
     - primary_node
-    - management_postgres == true
-    - create_db ==true
+    - management_postgres | bool
+    - create_db | bool
 
 - name: Create users on primary
   community.postgresql.postgresql_user:
@@ -37,9 +37,9 @@
     login_password: "{{ postgres_superuser_password }}"
   loop: "{{ users }}"
   when: 
-    - primary_node
-    - management_postgres == true
-    - create_db ==true
+  - primary_node
+  - management_postgres | bool
+  - create_db | bool
 
 - name: Create PgBouncer configuration
   template:
@@ -49,10 +49,9 @@
     group: postgres
     mode: '0640'
   when: 
-    - primary_node
-    - management_postgres == true
-    - create_db ==true
     - with_pgbouncer == true
+    - management_postgres | bool
+    - create_db | bool
 
 - name: Create userlist file
   template:
@@ -62,7 +61,6 @@
     group: postgres
     mode: '0640'
   when: 
-    - primary_node
-    - management_postgres == true
-    - create_db ==true
     - with_pgbouncer == true
+    - management_postgres | bool
+    - create_db | bool
