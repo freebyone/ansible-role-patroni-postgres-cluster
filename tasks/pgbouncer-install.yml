@@ -24,22 +24,9 @@
     group: postgres
     mode: '0640'
 
-- name: Install PgBouncer
-  become: true
-  package:
-    name: pgbouncer
-    state: present
-
 - name: Create symlink from /etc/pgbouncer to central directory
   file:
     src: "{{ pgbouncer_config_dir }}"
     dest: "/etc/pgbouncer"
     state: link
     force: yes
-
-- name: Start and enable PgBouncer
-  become: true
-  systemd:
-    name: pgbouncer
-    state: started
-    enabled: yes
