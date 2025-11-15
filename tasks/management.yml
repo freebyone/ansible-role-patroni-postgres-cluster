@@ -3,14 +3,14 @@
     url: "http://{{ inventory_hostname }}:{{ patroni_restapi_port }}/cluster"
     method: GET
   register: cluster_info
-  delegate_to: localhost
+  delegate_to: "{{ inventory_hostname }}"
   run_once: true
 
 - name: Get primary node name
   set_fact:
     primary_node_name: "{{ cluster_info.json.members | selectattr('role', 'match', '(master|leader)') | map(attribute='name') | first }}"
   run_once: true
-  delegate_to: localhost
+  delegate_to: "{{ inventory_hostname }}"
 
 - name: Debug info
   debug:
@@ -18,9 +18,7 @@
   run_once: true
 
 - name: Check if users exist on primary node
-  shell: |
-    docker exec {{ patroni_cluster_name }} \
-    psql -h localhost -U postgres -p {{ postgresql_port }} -w -d postgres -t -c "SELECT 1 FROM pg_user WHERE usename='{{ item.name }}';"
+  shell: "{{ postgresql_check_user_command }}"
   loop: "{{ users }}"
   register: user_check
   when:
@@ -35,9 +33,7 @@
     PGPASSWORD: "{{ postgres_superuser_password }}"
 
 - name: Create users on primary node
-  shell: |
-    docker exec {{ patroni_cluster_name }} \
-    psql -h localhost -U postgres -p {{ postgresql_port }} -w -d postgres -c "CREATE USER {{ item.item.name }} WITH PASSWORD '{{ item.item.password }}'{% if item.item.privileges is defined %} {{ item.item.privileges | join(' ') }}{% endif %};"
+  shell: "{{ postgresql_create_user_command }}"
   loop: "{{ user_check.results }}"
   when:
     - management_postgres | bool
@@ -51,13 +47,10 @@
     PGPASSWORD: "{{ postgres_superuser_password }}"
 
 - name: Check if databases exist on primary node
-  shell: |
-    docker exec {{ patroni_cluster_name }} \
-    psql -h localhost -U postgres -p {{ postgresql_port }} -w -d postgres -t -c "SELECT 1 FROM pg_database WHERE datname='{{ item.name }}';"
+  shell: "{{ postgresql_check_db_command }}"
   loop: "{{ databases }}"
   register: db_check
   when:
-    - management_postgres | bool
     - create_db | bool
   delegate_to: "{{ primary_node_name }}"
   run_once: true
@@ -68,12 +61,9 @@
     PGPASSWORD: "{{ postgres_superuser_password }}"
 
 - name: Create databases on primary node
-  shell: |
-    docker exec {{ patroni_cluster_name }} \
-    psql -h localhost -U postgres -p {{ postgresql_port }} -w -d postgres -c "CREATE DATABASE {{ item.item.name }}{% if item.item.owner is defined %} OWNER {{ item.item.owner }}{% endif %}{% if item.item.encoding is defined %} ENCODING '{{ item.item.encoding }}'{% endif %};"
+  shell: "{{ postgresql_create_db_command }}"
   loop: "{{ db_check.results }}"
   when:
-    - management_postgres | bool
     - create_db | bool
     - item.stdout | trim == ""
   delegate_to: "{{ primary_node_name }}"
@@ -83,13 +73,47 @@
   environment:
     PGPASSWORD: "{{ postgres_superuser_password }}"
 
-- name: Grant privileges to users for their databases
-  shell: |
-    docker exec {{ patroni_cluster_name }} \
-    psql -h localhost -U postgres -p {{ postgresql_port }} -w -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE {{ db.name }} TO {{ db.owner }};"
+- name: Grant database privileges to users
+  shell: "{{ postgresql_grant_db_privileges_command }}"
   loop: "{{ databases }}"
   when:
-    - management_postgres | bool
+    - create_db | bool
+    - db.privileges is defined
+  delegate_to: "{{ primary_node_name }}"
+  run_once: true
+  args:
+    warn: false
+  environment:
+    PGPASSWORD: "{{ postgres_superuser_password }}"
+  loop_control:
+    loop_var: db
+  with_subelements:
+    - "{{ db.privileges }}"
+    - priv
+
+- name: Set default privileges for users in their databases
+  shell: "{{ postgresql_base_psql_command }} -c \"ALTER DEFAULT PRIVILEGES FOR USER {{ db.owner }} IN SCHEMA PUBLIC GRANT ALL ON TABLES TO {{ priv.user }};\""
+  loop: "{{ databases }}"
+  when:
+    - create_db | bool
+    - db.privileges is defined
+    - "'ALL' in priv.privileges"
+  delegate_to: "{{ primary_node_name }}"
+  run_once: true
+  args:
+    warn: false
+  environment:
+    PGPASSWORD: "{{ postgres_superuser_password }}"
+  loop_control:
+    loop_var: db
+  with_subelements:
+    - "{{ db.privileges }}"
+    - priv
+
+- name: Grant privileges to users for their databases
+  shell: "{{ postgresql_grant_privileges_command }}"
+  loop: "{{ databases }}"
+  when:
     - create_db | bool
     - db.owner is defined and db.owner != 'postgres'
   delegate_to: "{{ primary_node_name }}"
@@ -105,22 +129,20 @@
   template:
     src: pgbouncer.ini.j2
     dest: "{{ pgbouncer_config_dir }}/pgbouncer.ini"
-    owner: postgres
-    group: postgres
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
     mode: '0640'
   when:
     - with_pgbouncer == true
-    - management_postgres | bool
     - create_db | bool
 
 - name: Create userlist file
   template:
     src: userlist.txt.j2
     dest: "{{ pgbouncer_config_dir }}/userlist.txt"
-    owner: postgres
-    group: postgres
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
     mode: '0640'
   when:
     - with_pgbouncer == true
-    - management_postgres | bool
     - create_db | bool
