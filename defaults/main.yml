@@ -14,6 +14,7 @@ postgresql_backup_dir: "{{ patroni_base_dir }}/backups"
 postgres_backup_script_path: "/data/backups"
 postgres_home_dir: "/var/lib/postgresql"
 patroni_home_dir: "/home/postgres/postgres.yml"
+pgbouncer_log_dir: "/var/lib/{{ patroni_cluster_name }}/pgbouncer"
 
 patroni_docker_image: "ghcr.io/zalando/spilo-17:4.0-p3"
 postgresql_version: 17
@@ -26,6 +27,7 @@ etcd_api_version: "v3"
 etcd_servers: "{% for host in groups['etcd_cluster'] %}{{ hostvars[host].ansible_host | default(host) }}:{{ etcd_client_port | default(2379) }}{% if not loop.last %},{% endif %}{% endfor %}"
 patroni_restapi_port: 8008
 postgresql_port: 5432
+pgbouncer_port: 6432
 
 patroni_postgres_group: "postgres"
 patroni_postgres_user: "postgres"
@@ -43,26 +45,26 @@ postgresql_parameters:
   work_mem: "4MB"
   maintenance_work_mem: "64MB"
   effective_cache_size: "1GB"
-  
+
   wal_level: "logical"
   max_wal_senders: "10"
   max_replication_slots: "10"
   wal_keep_size: "1GB"
   wal_buffers: "16MB"
-  
+
   effective_io_concurrency: "200"
   min_wal_size: "1GB"
   max_wal_size: "2GB"
-  
+
   max_prepared_transactions: "0"
   shared_preload_libraries: "pg_stat_statements"
   default_statistics_target: "100"
-  
+
   superuser_reserved_connections: "3"
   tcp_keepalives_idle: "60"
   tcp_keepalives_interval: "10"
   tcp_keepalives_count: "3"
-  
+
   idle_in_transaction_session_timeout: "60000"
   lock_timeout: "30000"
   statement_timeout: "60000"
@@ -70,58 +72,51 @@ postgresql_parameters:
 backup_retention_days: 30
 backup_schedule: "0 2 * * *"
 
+# PostgreSQL base command
+postgresql_base_command: "docker exec {{ patroni_cluster_name }}"
+
 # PostgreSQL connection parameters
 postgresql_connection_params: "-h localhost -U postgres -p {{ postgresql_port }} -w -d postgres"
 postgresql_base_psql_command: "{{ postgresql_base_command }} psql {{ postgresql_connection_params }}"
 
-# Check commands
 postgresql_check_user_command: "{{ postgresql_base_psql_command }} -t -c \"SELECT 1 FROM pg_user WHERE usename='{{ item.name }}';\""
 postgresql_check_db_command: "{{ postgresql_base_psql_command }} -t -c \"SELECT 1 FROM pg_database WHERE datname='{{ item.name }}';\""
 
-# Create commands
-postgresql_create_user_command: "{{ postgresql_base_psql_command }} -c \"CREATE USER {{ item.item.name }} WITH PASSWORD '{{ item.item.password }}'{% if item.item.privileges is defined %} {{ item.item.privileges | join(' ') }}{% endif %};\""
-postgresql_create_db_command: "{{ postgresql_base_psql_command }} -c \"CREATE DATABASE {{ item.item.name }}{% if item.item.owner is defined %} OWNER {{ item.item.owner }}{% endif %}{% if item.item.encoding is defined %} ENCODING '{{ item.item.encoding }}'{% endif %};\""
-postgresql_grant_privileges_command: "{{ postgresql_base_psql_command }} -c \"GRANT ALL PRIVILEGES ON DATABASE {{ db.name }} TO {{ db.owner }};\""
 
-# Privilege management commands
-postgresql_grant_db_privileges_command: "{{ postgresql_base_psql_command }} -c \"GRANT {{ priv.privileges }} ON DATABASE {{ db.name }} TO {{ priv.user }};\""
-postgresql_revoke_db_privileges_command: "{{ postgresql_base_psql_command }} -c \"REVOKE ALL PRIVILEGES ON DATABASE {{ db.name }} FROM {{ priv.user }};\""
+
+users:
+  - name: appuser
+    password: appuser
+
+  - name: appuser2
+    password: appuser2
+  - name: appuser3
+    password: appuser3
+
 
 databases:
   - name: app
     owner: appuser
     encoding: UTF8
-    privileges:
-      - user: appuser
-        privileges: "ALL"
-      - user: readonly_user
-        privileges: "CONNECT,TEMPORARY"
-      - user: app_admin
-        privileges: "CREATE,CONNECT"
-  - name: appdb
-    owner: postgres
-    privileges:
-      - user: appuser
-        privileges: "ALL"
-      - user: reporting_user
-        privileges: "CONNECT"
+  - name: app2
+    owner: appuser3
+    encoding: UTF8
 
-users:
-  - name: appuser
-    password: appuser
-    privileges:
-      - LOGIN
-      - CREATEDB
-  - name: readonly_user
-    password: readonly123
-    privileges:
-      - LOGIN
-  - name: app_admin
-    password: admin123
-    privileges:
-      - LOGIN
-      - CREATEDB
-  - name: reporting_user
-    password: report123
-    privileges:
-      - LOGIN
+privileges:
+  - db_name: app
+    user: appuser2
+    privileges: "SELECT, INSERT"
+  - db_name: app2
+    user: appuser2
+    privileges: "SELECT, INSERT"
+
+
+
+pgbouncer_pool_mode: transaction
+pgbouncer_max_client_conn: 100
+pgbouncer_default_pool_size: 20
+pgbouncer_admin_users: "postgres"
+pgbouncer_stats_users: "{{ monitoring_user }}"
+
+# Параметры для подключения к PgBouncer
+pgbouncer_connection_params: "-h localhost -U postgres -p {{ pgbouncer_port }} -w -d pgbouncer"

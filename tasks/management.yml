@@ -12,137 +12,89 @@
   run_once: true
   delegate_to: "{{ inventory_hostname }}"
 
-- name: Debug info
+- name: Debug primary node
   debug:
     msg: "Primary node is: {{ primary_node_name }}"
   run_once: true
 
-- name: Check if users exist on primary node
-  shell: "{{ postgresql_check_user_command }}"
-  loop: "{{ users }}"
-  register: user_check
-  when:
-    - management_postgres | bool
-    - create_db | bool
-  delegate_to: "{{ primary_node_name }}"
-  run_once: true
-  changed_when: false
-  args:
-    warn: false
-  environment:
-    PGPASSWORD: "{{ postgres_superuser_password }}"
+- name: Create PostgreSQL users and databases
+  block:
+    - name: Create users
+      shell: |
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} -c "CREATE USER {{ item.name }} WITH PASSWORD '{{ item.password }}';" || echo "User already exists"
+      loop: "{{ users }}"
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+      ignore_errors: true
 
-- name: Create users on primary node
-  shell: "{{ postgresql_create_user_command }}"
-  loop: "{{ user_check.results }}"
-  when:
-    - management_postgres | bool
-    - create_db | bool
-    - item.stdout | trim == ""
-  delegate_to: "{{ primary_node_name }}"
-  run_once: true
-  args:
-    warn: false
-  environment:
-    PGPASSWORD: "{{ postgres_superuser_password }}"
+    - name: Create databases
+      shell: |
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} -c "CREATE DATABASE {{ item.name }} WITH OWNER {{ item.owner }} ENCODING '{{ item.encoding | default('UTF8') }}';" || echo "Database already exists"
+      loop: "{{ databases }}"
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+      ignore_errors: true
 
-- name: Check if databases exist on primary node
-  shell: "{{ postgresql_check_db_command }}"
-  loop: "{{ databases }}"
-  register: db_check
-  when:
-    - create_db | bool
-  delegate_to: "{{ primary_node_name }}"
-  run_once: true
-  changed_when: false
-  args:
-    warn: false
-  environment:
-    PGPASSWORD: "{{ postgres_superuser_password }}"
+    - name: Grant privileges
+      shell: |
+        {{ postgresql_base_command }} psql -h localhost -U postgres -p {{ postgresql_port }} -w -d {{ item.db_name }} -c "GRANT {{ item.privileges }} ON ALL TABLES IN SCHEMA '{{ item.schema | default('public') }}' TO {{ item.user }};"
+      loop: "{{ privileges }}"
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+  when: management_postgres | bool
 
-- name: Create databases on primary node
-  shell: "{{ postgresql_create_db_command }}"
-  loop: "{{ db_check.results }}"
-  when:
-    - create_db | bool
-    - item.stdout | trim == ""
-  delegate_to: "{{ primary_node_name }}"
-  run_once: true
-  args:
-    warn: false
-  environment:
-    PGPASSWORD: "{{ postgres_superuser_password }}"
+- name: Configure PgBouncer in container
+  block:
+    - name: Create PgBouncer configuration
+      template:
+        src: pgbouncer.ini.j2
+        dest: "{{ pgbouncer_config_dir }}/pgbouncer.ini"
+        owner: "{{ patroni_postgres_user }}"
+        group: "{{ patroni_postgres_group }}"
+        mode: '0640'
+      when:
+        - with_pgbouncer == true
 
-- name: Grant database privileges to users
-  shell: "{{ postgresql_grant_db_privileges_command }}"
-  loop: "{{ databases }}"
-  when:
-    - create_db | bool
-    - db.privileges is defined
-  delegate_to: "{{ primary_node_name }}"
-  run_once: true
-  args:
-    warn: false
-  environment:
-    PGPASSWORD: "{{ postgres_superuser_password }}"
-  loop_control:
-    loop_var: db
-  with_subelements:
-    - "{{ db.privileges }}"
-    - priv
+    - name: Create userlist file
+      template:
+        src: userlist.txt.j2
+        dest: "{{ pgbouncer_config_dir }}/userlist"
+        owner: "{{ patroni_postgres_user }}"
+        group: "{{ patroni_postgres_group }}"
+        mode: '0640'
+      when:
+        - with_pgbouncer == true
 
-- name: Set default privileges for users in their databases
-  shell: "{{ postgresql_base_psql_command }} -c \"ALTER DEFAULT PRIVILEGES FOR USER {{ db.owner }} IN SCHEMA PUBLIC GRANT ALL ON TABLES TO {{ priv.user }};\""
-  loop: "{{ databases }}"
-  when:
-    - create_db | bool
-    - db.privileges is defined
-    - "'ALL' in priv.privileges"
-  delegate_to: "{{ primary_node_name }}"
-  run_once: true
-  args:
-    warn: false
-  environment:
-    PGPASSWORD: "{{ postgres_superuser_password }}"
-  loop_control:
-    loop_var: db
-  with_subelements:
-    - "{{ db.privileges }}"
-    - priv
+    - name: Create PgBouncer log directory
+      shell: |
+        {{ postgresql_base_command }} mkdir -p /var/log/pgbouncer
+        {{ postgresql_base_command }} chown postgres:postgres /var/log/pgbouncer
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
 
-- name: Grant privileges to users for their databases
-  shell: "{{ postgresql_grant_privileges_command }}"
-  loop: "{{ databases }}"
-  when:
-    - create_db | bool
-    - db.owner is defined and db.owner != 'postgres'
-  delegate_to: "{{ primary_node_name }}"
-  run_once: true
-  args:
-    warn: false
-  environment:
-    PGPASSWORD: "{{ postgres_superuser_password }}"
-  loop_control:
-    loop_var: db
+    - name: Create PgBouncer run directory
+      shell: |
+        {{ postgresql_base_command }} mkdir -p /var/run/pgbouncer
+        {{ postgresql_base_command }} chown postgres:postgres /var/run/pgbouncer
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
 
-- name: Create PgBouncer configuration
-  template:
-    src: pgbouncer.ini.j2
-    dest: "{{ pgbouncer_config_dir }}/pgbouncer.ini"
-    owner: "{{ patroni_postgres_user }}"
-    group: "{{ patroni_postgres_group }}"
-    mode: '0640'
-  when:
+    - name: Start PgBouncer in container
+      shell: |
+        {{ postgresql_base_command }} pgbouncer -d /etc/pgbouncer/pgbouncer.ini
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+      async: 10
+      poll: 0
+
+    - name: Wait for PgBouncer to start
+      wait_for:
+        host: "{{ primary_node_name }}"
+        port: "{{ pgbouncer_port }}"
+        timeout: 30
+      run_once: true
+
+  when: 
+    - create_db | bool
     - with_pgbouncer == true
-    - create_db | bool
-
-- name: Create userlist file
-  template:
-    src: userlist.txt.j2
-    dest: "{{ pgbouncer_config_dir }}/userlist.txt"
-    owner: "{{ patroni_postgres_user }}"
-    group: "{{ patroni_postgres_group }}"
-    mode: '0640'
-  when:
-    - with_pgbouncer == true
-    - create_db | bool
+    - primary_node_name is defined
