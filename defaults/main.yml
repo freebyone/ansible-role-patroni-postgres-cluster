@@ -14,7 +14,7 @@ postgresql_backup_dir: "{{ patroni_base_dir }}/backups"
 postgres_backup_script_path: "/data/backups"
 postgres_home_dir: "/var/lib/postgresql"
 patroni_home_dir: "/home/postgres/postgres.yml"
-pgbouncer_log_dir: "/var/lib/{{ patroni_cluster_name }}/pgbouncer"
+pgbouncer_log_dir: "/var/log/{{ patroni_cluster_name }}/pgbouncer"
 
 patroni_docker_image: "ghcr.io/zalando/spilo-17:4.0-p3"
 postgresql_version: 17
@@ -113,10 +113,13 @@ privileges:
 
 
 pgbouncer_pool_mode: transaction
+pgbouncer_server_idle_transaction: 7000
+pgbouncer_client_idle_transaction: 3000
 pgbouncer_max_client_conn: 100
 pgbouncer_default_pool_size: 20
 pgbouncer_admin_users: "postgres"
 pgbouncer_stats_users: "{{ monitoring_user }}"
+pgbouncer_verbose: 0
 
-# Параметры для подключения к PgBouncer
+
 pgbouncer_connection_params: "-h localhost -U postgres -p {{ pgbouncer_port }} -w -d pgbouncer"

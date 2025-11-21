@@ -1,10 +1,11 @@
 - name: restart patroni
-  community.docker.docker_container:
-    name: "patroni-{{ inventory_hostname }}"
-    state: restarted
+  become: true
+  systemd:
+    name: "{{ patroni_cluster_name }}"
+    state: reloaded
 
 - name: reload pgbouncer
-  become: yes
+  become: true
   systemd:
     name: pgbouncer
     state: reloaded

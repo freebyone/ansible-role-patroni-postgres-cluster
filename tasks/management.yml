@@ -1,21 +1,23 @@
-- name: Check cluster status
-  uri:
-    url: "http://{{ inventory_hostname }}:{{ patroni_restapi_port }}/cluster"
-    method: GET
-  register: cluster_info
-  delegate_to: "{{ inventory_hostname }}"
-  run_once: true
+- name: Check cluster status and find master node
+  block:
+    - name: Check cluster status
+      uri:
+        url: "http://{{ inventory_hostname }}:{{ patroni_restapi_port }}/cluster"
+        method: GET
+      register: cluster_info
+      delegate_to: "{{ inventory_hostname }}"
+      run_once: true
 
-- name: Get primary node name
-  set_fact:
-    primary_node_name: "{{ cluster_info.json.members | selectattr('role', 'match', '(master|leader)') | map(attribute='name') | first }}"
-  run_once: true
-  delegate_to: "{{ inventory_hostname }}"
+    - name: Get primary node name
+      set_fact:
+        primary_node_name: "{{ cluster_info.json.members | selectattr('role', 'match', '(master|leader)') | map(attribute='name') | first }}"
+      run_once: true
+      delegate_to: "{{ inventory_hostname }}"
 
-- name: Debug primary node
-  debug:
-    msg: "Primary node is: {{ primary_node_name }}"
-  run_once: true
+    - name: Debug primary node
+      debug:
+        msg: "Primary node is: {{ primary_node_name }}"
+      run_once: true
 
 - name: Create PostgreSQL users and databases
   block:
@@ -64,13 +66,6 @@
         mode: '0640'
       when:
         - with_pgbouncer == true
-
-    - name: Create PgBouncer log directory
-      shell: |
-        {{ postgresql_base_command }} mkdir -p /var/log/pgbouncer
-        {{ postgresql_base_command }} chown postgres:postgres /var/log/pgbouncer
-      delegate_to: "{{ primary_node_name }}"
-      run_once: true
 
     - name: Create PgBouncer run directory
       shell: |

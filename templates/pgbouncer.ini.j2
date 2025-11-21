@@ -13,3 +13,7 @@ max_client_conn = {{ pgbouncer_max_client_conn }}
 default_pool_size = {{ pgbouncer_default_pool_size }}
 admin_users = {{ postgres_admin_users }}
 stats_users = {{ monitoring_user }}
+log_dir = {{ pgbouncer_log_dir }}
+verbose = {{ pgbouncer_verbose }}
+server_idle_timeout = {{ pgbouncer_server_idle_timeout }}
+client_idle_timeout = {{ pgbouncer_client_idle_timeout }}

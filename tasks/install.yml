@@ -41,7 +41,7 @@
     - "{{ postgresql_wal_dir }}"
     - "{{ postgresql_backup_dir }}"
     - "{{ pgbouncer_config_dir }}"
-    - "{{ pgbouncer_config_dir }}"
+    - "{{ pgbouncer_log_dir }}"
 
 - name: Generate Patroni configuration
   template:
