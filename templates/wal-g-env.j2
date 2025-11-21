@@ -1,0 +1,25 @@
+WALG_S3_PREFIX={{ wal_g_s3_prefix }}
+AWS_ACCESS_KEY_ID={{ wal_g_aws_access_key_id }}
+AWS_SECRET_ACCESS_KEY={{ wal_g_aws_secret_access_key }}
+AWS_REGION={{ wal_g_aws_region }}
+AWS_ENDPOINT={{ wal_g_aws_endpoint | default('') }}
+
+WALG_COMPRESSION_METHOD={{ wal_g_compression_method }}
+WALG_DELTA_MAX_STEPS={{ wal_g_delta_max_steps }}
+
+WALG_UPLOAD_CONCURRENCY={{ wal_g_upload_concurrency }}
+WALG_DOWNLOAD_CONCURRENCY={{ wal_g_download_concurrency }}
+WALG_UPLOAD_DISK_CONCURRENCY={{ wal_g_upload_disk_concurrency | default(2) }}
+
+WALG_BACKUP_COMPRESSION_METHOD={{ wal_g_compression_method }}
+WALG_PREVENT_WAL_OVERWRITE=true
+
+WALG_LOG_LEVEL=INFO
+
+# PGP settings (if using encryption)
+{% if wal_g_pgp_key_path is defined %}
+WALG_PGP_KEY_PATH={{ wal_g_pgp_key_path }}
+{% endif %}
+{% if wal_g_pgp_key_id is defined %}
+WALG_PGP_KEY_ID={{ wal_g_pgp_key_id }}
+{% endif %}

@@ -15,6 +15,7 @@ postgres_backup_script_path: "/data/backups"
 postgres_home_dir: "/var/lib/postgresql"
 patroni_home_dir: "/home/postgres/postgres.yml"
 pgbouncer_log_dir: "/var/log/{{ patroni_cluster_name }}/pgbouncer"
+wal_g_dir: "{{ patroni_base_dir }}/wal-g/env"
 
 patroni_docker_image: "ghcr.io/zalando/spilo-17:4.0-p3"
 postgresql_version: 17
@@ -38,33 +39,41 @@ patroni_restapi_username: "patroni"
 patroni_restapi_password: "patroni"
 monitoring_user: "stats_user"
 
-# PostgreSQL parameters for 2GB RAM
+wal_g_s3_prefix: "s3://your-bucket-name/patroni-cluster/"
+wal_g_aws_access_key_id: "your-access-key"
+wal_g_aws_secret_access_key: "your-secret-key"
+wal_g_aws_region: "your-region"
+wal_g_aws_endpoint: ""  # For S3 services
+wal_g_compression_method: "lz4"
+wal_g_delta_max_steps: 7
+wal_g_upload_concurrency: 4
+wal_g_download_concurrency: 4
+wal_g_upload_disk_concurrency: 2
+
+pgbouncer_auth_password: "pgbouncer_password"
+monitoring_password: "monitoring_password"
+
 postgresql_parameters:
   max_connections: "100"
   shared_buffers: "512MB"
   work_mem: "4MB"
   maintenance_work_mem: "64MB"
   effective_cache_size: "1GB"
-
   wal_level: "logical"
   max_wal_senders: "10"
   max_replication_slots: "10"
   wal_keep_size: "1GB"
   wal_buffers: "16MB"
-
   effective_io_concurrency: "200"
   min_wal_size: "1GB"
   max_wal_size: "2GB"
-
-  max_prepared_transactions: "0"
+  max_prepared_transactions: "64"
   shared_preload_libraries: "pg_stat_statements"
   default_statistics_target: "100"
-
   superuser_reserved_connections: "3"
   tcp_keepalives_idle: "60"
   tcp_keepalives_interval: "10"
   tcp_keepalives_count: "3"
-
   idle_in_transaction_session_timeout: "60000"
   lock_timeout: "30000"
   statement_timeout: "60000"
