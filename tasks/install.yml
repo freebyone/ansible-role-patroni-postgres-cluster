@@ -105,6 +105,16 @@
     mode: '0640'
   when: with_pgbouncer == true
 
+- name: Create userlist file
+  template:
+    src: userlist.txt.j2
+    dest: "{{ pgbouncer_config_dir }}/userlist"
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
+    mode: '0640'
+  when:
+    - with_pgbouncer == true
+
 - name: Reload systemd daemon
   become: true
   systemd:

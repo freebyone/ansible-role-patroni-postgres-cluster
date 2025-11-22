@@ -1,7 +1,7 @@
 ---
 flush_all: false
 new_cluster: false
-with_pgbouncer: false
+with_pgbouncer: true
 create_db: false
 with_backup: false
 
@@ -123,8 +123,8 @@ privileges:
 
 
 pgbouncer_pool_mode: transaction
-pgbouncer_server_idle_transaction: 7000
-pgbouncer_client_idle_transaction: 3000
+pgbouncer_server_idle_timeout: 7000
+pgbouncer_client_idle_timeout: 3000
 pgbouncer_max_client_conn: 100
 pgbouncer_default_pool_size: 20
 pgbouncer_admin_users: "postgres"

@@ -1,6 +1,7 @@
 [databases]
+postgres = host=localhost port={{ postgresql_port }} auth_user=postgres
 {% for db in databases %}
-* = host=localhost port={{ postgresql_port }} auth_user=postgres
+{{ db.name }} = host=localhost port={{ postgresql_port }} auth_user=postgres
 {% endfor %}
 
 [pgbouncer]
@@ -11,8 +12,8 @@ auth_file = {{ pgbouncer_config_dir }}/userlist
 pool_mode = {{ pgbouncer_pool_mode }}
 max_client_conn = {{ pgbouncer_max_client_conn }}
 default_pool_size = {{ pgbouncer_default_pool_size }}
-admin_users = {{ postgres_admin_users }}
-stats_users = {{ monitoring_user }}
+admin_users = {{ pgbouncer_admin_users }}
+stats_users = {{ pgbouncer_stats_users }}
 log_dir = {{ pgbouncer_log_dir }}
 verbose = {{ pgbouncer_verbose }}
 server_idle_timeout = {{ pgbouncer_server_idle_timeout }}
