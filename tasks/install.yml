@@ -62,13 +62,6 @@
   retries: 3
   delay: 5
 
-- name: Generate Patroni configuration
-  become: true
-  template:
-    src: patroni.yml.j2
-    dest: "{{ patroni_config_dir }}/patroni.yml"
-    mode: '0644'
-
 - name: Create Patroni systemd service
   become: true
   template:
@@ -76,10 +69,19 @@
     dest: "/etc/systemd/system/{{ patroni_cluster_name }}.service"
     mode: '0644'
 
+- name: Create WAL-G environment directory
+  file:
+    path: "{{ wal_g_dir }}"
+    state: directory
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
+    mode: '0750'
+  become: true
+
 - name: Create WAL-G environment configuration
   template:
     src: wal-g-env.j2
-    dest: "{{ wal_g_dir }}"
+    dest: "{{ wal_g_dir }}/wal-g-env"
     owner: "{{ patroni_postgres_user }}"
     group: "{{ patroni_postgres_group }}"
     mode: '0640'
@@ -94,7 +96,7 @@
   become: true
   systemd:
     name: "{{ patroni_cluster_name }}"
-    state: started
+    state: restarted
     enabled: yes
 
 - name: Wait for PostgreSQL to be ready

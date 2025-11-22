@@ -26,7 +26,7 @@ ExecStart=/usr/bin/docker run \
   --log-driver=journald \
   --log-opt tag="{{ patroni_cluster_name }}" \
   -e ETCD3_HOSTS="{{ etcd_servers }}" \
-  -e PGBOUNCER_CONFIG="/etc/pgbouncer/pgbouncer.ini" \
+  -e PGBOUNCER_CONFIGURATION="/etc/pgbouncer/pgbouncer.ini" \
   {{ patroni_docker_image }}
 
 ExecStop=/usr/bin/docker stop {{ patroni_cluster_name }}

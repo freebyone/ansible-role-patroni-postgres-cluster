@@ -28,9 +28,9 @@ bootstrap:
         archive_command: "wal-g wal-push %p"
         restore_command: "wal-g wal-fetch %f %p"
         archive_timeout: 300
-        {% for key, value in postgresql_parameters.items() %}
-        {{ key }}: "{{ value }}"
-        {% endfor %}
+{% for key, value in postgresql_parameters.items() %}
+        {{ key }}: {{ value | to_json }}
+{% endfor %}
 
   initdb:
   - encoding: UTF8
@@ -50,15 +50,10 @@ bootstrap:
       options:
         - createrole
         - createdb
-        - superuser
     replicator:
       password: "{{ replication_password }}"
       options:
         - replication
-    {{ monitoring_user }}:
-      password: "{{ monitoring_password }}"
-      options:
-        - login
     pgbouncer:
       password: "{{ pgbouncer_auth_password }}"
       options:
