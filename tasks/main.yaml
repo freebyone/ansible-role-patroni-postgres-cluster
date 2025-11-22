@@ -6,7 +6,7 @@
 
 - name: Install pgbouncer
   become: true
-  ansible.builtin.import_tasks: pgbouncer-install.yml
+  ansible.builtin.import_tasks: pgbouncer-update.yml
   when: flush_all != true and with_pgbouncer == true
   tags: pgbouncer
 

@@ -85,13 +85,6 @@
       when:
         - with_pgbouncer == true
 
-    - name: Create PgBouncer run directory
-      shell: |
-        {{ postgresql_base_command }} mkdir -p /var/run/pgbouncer
-        {{ postgresql_base_command }} chown postgres:postgres /var/run/pgbouncer
-      delegate_to: "{{ primary_node_name }}"
-      run_once: true
-
     - name: Start PgBouncer in container
       shell: |
         {{ postgresql_base_command }} pgbouncer -d /etc/pgbouncer/pgbouncer.ini

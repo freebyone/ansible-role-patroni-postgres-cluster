@@ -1,0 +1,31 @@
+---
+- name: Create PgBouncer configuration
+  template:
+    src: pgbouncer.ini.j2
+    dest: "{{ pgbouncer_config_dir }}/pgbouncer.ini"
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
+    mode: '0640'
+
+- name: Create userlist file
+  template:
+    src: userlist.txt.j2
+    dest: "{{ pgbouncer_config_dir }}/userlist"
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
+    mode: '0640'
+
+- name: Start PgBouncer in container
+  shell: |
+    {{ postgresql_base_command }} pgbouncer -d /etc/pgbouncer/pgbouncer.ini
+    delegate_to: "{{ primary_node_name }}"
+  run_once: true
+  async: 10
+  poll: 0
+
+- name: Wait for PgBouncer to start
+  wait_for:
+    host: "{{ primary_node_name }}"
+    port: "{{ pgbouncer_port }}"
+    timeout: 30
+  run_once: true
