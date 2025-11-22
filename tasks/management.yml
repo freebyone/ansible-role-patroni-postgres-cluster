@@ -23,7 +23,7 @@
   block:
     - name: Create users
       shell: |
-        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} -c "CREATE USER {{ item.name }} WITH PASSWORD '{{ item.password }}';" || echo "User already exists"
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} -c "CREATE USER {{ item.name }} WITH PASSWORD '{{ item.password }}'{% if item.connlimit is defined %} CONNECTION LIMIT {{ item.connlimit }}{% endif %};" || echo "User already exists"
       loop: "{{ users }}"
       delegate_to: "{{ primary_node_name }}"
       run_once: true
@@ -31,8 +31,26 @@
 
     - name: Create databases
       shell: |
-        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} -c "CREATE DATABASE {{ item.name }} WITH OWNER {{ item.owner }} ENCODING '{{ item.encoding | default('UTF8') }}';" || echo "Database already exists"
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} -c "CREATE DATABASE {{ item.name }} WITH OWNER {{ item.owner }} ENCODING '{{ item.encoding | default('UTF8') }}'{% if item.connlimit is defined %} CONNECTION LIMIT {{ item.connlimit }}{% endif %};" || echo "Database already exists"
       loop: "{{ databases }}"
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+      ignore_errors: true
+
+    - name: Set connection limits for existing users
+      shell: |
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} -c "ALTER USER {{ item.name }} CONNECTION LIMIT {{ item.connlimit }};"
+      loop: "{{ users }}"
+      when: item.connlimit is defined
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+      ignore_errors: true
+
+    - name: Set connection limits for existing databases
+      shell: |
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} -c "ALTER DATABASE {{ item.name }} CONNECTION LIMIT {{ item.connlimit }};"
+      loop: "{{ databases }}"
+      when: item.connlimit is defined
       delegate_to: "{{ primary_node_name }}"
       run_once: true
       ignore_errors: true

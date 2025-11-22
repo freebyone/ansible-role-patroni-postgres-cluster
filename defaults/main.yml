@@ -96,27 +96,28 @@ postgresql_check_db_command: "{{ postgresql_base_psql_command }} -t -c \"SELECT 
 users:
   - name: appuser
     password: appuser
-
+    connlimit: 10
   - name: appuser2
     password: appuser2
+    connlimit: 5
   - name: appuser3
     password: appuser3
-
 
 databases:
   - name: app
     owner: appuser
     encoding: UTF8
+    connlimit: 50
   - name: app2
-    owner: appuser3
+    owner: appuser2
     encoding: UTF8
 
 privileges:
   - db_name: app
-    user: appuser2
+    user: appuser3
     privileges: "SELECT, INSERT"
   - db_name: app2
-    user: appuser2
+    user: appuser3
     privileges: "SELECT, INSERT"
 
 

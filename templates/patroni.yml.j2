@@ -54,10 +54,6 @@ bootstrap:
       password: "{{ replication_password }}"
       options:
         - replication
-    pgbouncer:
-      password: "{{ pgbouncer_auth_password }}"
-      options:
-        - login
 
 postgresql:
   listen: 0.0.0.0:{{ postgresql_port }}
@@ -72,7 +68,6 @@ postgresql:
       username: postgres
       password: "{{ postgres_superuser_password }}"
   
-  # WAL-G configuration
   recovery_conf:
     restore_command: "wal-g wal-fetch %f %p"
   
@@ -84,7 +79,6 @@ postgresql:
     max-rate: 100M
     checkpoint: fast
   
-  # WAL-G backup configuration
   wal_g:
     command: /usr/local/bin/wal-g
     env_dir: /etc/wal-g/env
