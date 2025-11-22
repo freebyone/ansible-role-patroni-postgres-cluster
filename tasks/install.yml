@@ -87,6 +87,24 @@
     mode: '0640'
   become: true
 
+- name: Ensure pgbouncer config directory exists
+  file:
+    path: "{{ pgbouncer_config_dir }}"
+    state: directory
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
+    mode: '0755'
+  become: true
+
+- name: Create PgBouncer configuration file
+  template:
+    src: pgbouncer.ini.j2
+    dest: "{{ pgbouncer_config_dir }}/pgbouncer.ini"
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
+    mode: '0640'
+  when: with_pgbouncer == true
+
 - name: Reload systemd daemon
   become: true
   systemd:
