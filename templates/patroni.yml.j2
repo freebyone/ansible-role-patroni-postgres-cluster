@@ -7,7 +7,11 @@ restapi:
   authentication:
     username: "{{ patroni_restapi_username }}"
     password: "{{ patroni_restapi_password }}"
-
+{% if patroni_restapi_ssl_enabled | default(false) %}
+  certfile: "{{ patroni_ssl_cert_path }}"
+  keyfile: "{{ patroni_ssl_key_path }}"
+  cafile: "{{ patroni_ssl_ca_path }}"
+{% endif %}
 etcd3:
   hosts: "{{ etcd_servers }}"
   protocol: http
@@ -28,6 +32,12 @@ bootstrap:
         archive_command: "wal-g wal-push %p"
         restore_command: "wal-g wal-fetch %f %p"
         archive_timeout: 300
+{% if postgresql_ssl_enabled | default(false) %}
+        ssl: on
+        ssl_cert_file: '{{ postgresql_ssl_cert_file | default("server.crt") }}'
+        ssl_key_file: '{{ postgresql_ssl_key_file | default("server.key") }}'
+        ssl_ca_file: '{{ postgresql_ssl_ca_file | default("") }}'
+{% endif %}
 {% for key, value in postgresql_parameters.items() %}
         {{ key }}: {{ value | to_json }}
 {% endfor %}
@@ -35,14 +45,24 @@ bootstrap:
   initdb:
   - encoding: UTF8
   - data-checksums
+{% if postgresql_ssl_enabled | default(false) %}
+  - auth-host="{{ postgres_password_encryption_method }}"
+  - auth-local=trust
+{% endif %}
 
   pg_hba:
   - local all all trust
-  - host all all 127.0.0.1/32 md5
-  - host replication replicator 0.0.0.0/0 md5
-  - host all all 0.0.0.0/0 md5
-  - host pgbouncer pgbouncer 127.0.0.1/32 md5
-  - host pgbouncer pgbouncer ::1/128 md5
+  - host all all 127.0.0.1/32 "{{ postgres_password_encryption_method }}"
+  - host replication replicator 0.0.0.0/0 "{{ postgres_password_encryption_method }}"
+{% if postgresql_ssl_enabled | default(false) %}
+  - hostssl all all 0.0.0.0/0 "{{ postgres_password_encryption_method }}"
+  - hostssl pgbouncer pgbouncer 127.0.0.1/32 "{{ postgres_password_encryption_method }}"
+  - hostssl pgbouncer pgbouncer ::1/128 "{{ postgres_password_encryption_method }}"
+{% else %}
+  - host all all 0.0.0.0/0 "{{ postgres_password_encryption_method }}"
+  - host pgbouncer pgbouncer 127.0.0.1/32 "{{ postgres_password_encryption_method }}"
+  - host pgbouncer pgbouncer ::1/128 "{{ postgres_password_encryption_method }}"
+{% endif %}
 
   users:
     postgres:
@@ -88,3 +108,9 @@ postgresql:
     archive_command: "wal-g wal-push %p"
     restore_command: "wal-g wal-fetch %f %p"
     archive_timeout: 300
+{% if postgresql_ssl_enabled | default(false) %}
+    ssl: on
+    ssl_cert_file: '{{ postgresql_ssl_cert_file | default("server.crt") }}'
+    ssl_key_file: '{{ postgresql_ssl_key_file | default("server.key") }}'
+    ssl_ca_file: '{{ postgresql_ssl_ca_file | default("") }}'
+{% endif %}

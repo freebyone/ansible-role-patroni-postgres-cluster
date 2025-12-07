@@ -30,9 +30,37 @@ patroni_restapi_port: 8008
 postgresql_port: 5432
 pgbouncer_port: 6432
 
+# SSL for PostgreSQL
+postgresql_ssl_enabled: true
+postgresql_ssl_cert_src: "files/ssl/postgresql/server.crt"
+postgresql_ssl_key_src: "files/ssl/postgresql/server.key"
+postgresql_ssl_ca_src: "files/ssl/postgresql/ca.crt"
+postgresql_ssl_cert_file: "server.crt"
+postgresql_ssl_key_file: "server.key"
+postgresql_ssl_ca_file: "ca.crt"
+postgresql_ssl_dir: "{{ patroni_config_dir }}/ssl"
+
+# SSL for Patroni REST API
+patroni_restapi_ssl_enabled: false
+patroni_ssl_cert_src: "files/ssl/patroni/cert.pem"
+patroni_ssl_key_src: "files/ssl/patroni/key.pem"
+patroni_ssl_ca_src: "files/ssl/patroni/ca.pem"
+patroni_ssl_cert_path: "{{ patroni_config_dir }}/ssl/cert.pem"
+patroni_ssl_key_path: "{{ patroni_config_dir }}/ssl/key.pem"
+patroni_ssl_ca_path: "{{ patroni_config_dir }}/ssl/ca.pem"
+
+# SSL for PgBouncer
+pgbouncer_ssl_enabled: false
+pgbouncer_ssl_cert_path: "{{ pgbouncer_config_dir }}/ssl/cert.pem"
+pgbouncer_ssl_key_path: "{{ pgbouncer_config_dir }}/ssl/key.pem"
+pgbouncer_ssl_ca_path: "{{ pgbouncer_config_dir }}/ssl/ca.pem"
+
+
+postgres_password_encryption_method: md5 # md5 or scram-sha-256
+
 patroni_postgres_group: "postgres"
 patroni_postgres_user: "postgres"
-replication_password: "adpostgresmin"
+replication_password: "postgres"
 postgres_superuser_password: "postgres"
 postgres_admin_users: "postgres"
 patroni_restapi_username: "patroni"
@@ -43,7 +71,7 @@ wal_g_s3_prefix: "s3://your-bucket-name/patroni-cluster/"
 wal_g_aws_access_key_id: "your-access-key"
 wal_g_aws_secret_access_key: "your-secret-key"
 wal_g_aws_region: "your-region"
-wal_g_aws_endpoint: ""  # For S3 services
+wal_g_aws_endpoint: "endpoint"  # For S3 services
 wal_g_compression_method: "lz4"
 wal_g_delta_max_steps: 7
 wal_g_upload_concurrency: 4

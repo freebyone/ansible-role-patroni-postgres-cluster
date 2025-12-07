@@ -16,7 +16,52 @@
     create_home: yes
     comment: "patroni-postgres database server"
   become: true
+- name: Create SSL directory if needed
+  file:
+    path: "{{ postgresql_ssl_dir | default(patroni_config_dir + '/ssl') }}"
+    state: directory
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
+    mode: '0750'
+  become: true
+  when: postgresql_ssl_enabled | default(false)
 
+- name: Copy PostgreSQL SSL certificates
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ postgresql_ssl_dir | default(patroni_config_dir + '/ssl') }}/{{ item.dest }}"
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
+    mode: '0640'
+  loop:
+    - { src: "{{ postgresql_ssl_cert_src }}", dest: "{{ postgresql_ssl_cert_file | default('server.crt') }}" }
+    - { src: "{{ postgresql_ssl_key_src }}", dest: "{{ postgresql_ssl_key_file | default('server.key') }}" }
+  when: postgresql_ssl_enabled | default(false) and postgresql_ssl_cert_src is defined
+  become: true
+
+- name: Copy PostgreSQL SSL CA certificate if provided
+  copy:
+    src: "{{ postgresql_ssl_ca_src }}"
+    dest: "{{ postgresql_ssl_dir | default(patroni_config_dir + '/ssl') }}/{{ postgresql_ssl_ca_file | default('ca.crt') }}"
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
+    mode: '0640'
+  when: postgresql_ssl_enabled | default(false) and postgresql_ssl_ca_src is defined
+  become: true
+
+- name: Copy Patroni REST API SSL certificates
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ patroni_ssl_cert_path }}"
+    owner: "{{ patroni_postgres_user }}"
+    group: "{{ patroni_postgres_group }}"
+    mode: '0640'
+  loop:
+    - { src: "{{ patroni_ssl_cert_src }}", dest: "{{ patroni_ssl_cert_path }}" }
+    - { src: "{{ patroni_ssl_key_src }}", dest: "{{ patroni_ssl_key_path }}" }
+  when: patroni_restapi_ssl_enabled | default(false) and patroni_ssl_cert_src is defined
+  become: true
+  
 - name: Create data directory with strict permissions
   file:
     path: "{{ patroni_base_dir }}"

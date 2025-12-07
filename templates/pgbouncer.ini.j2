@@ -1,13 +1,13 @@
 [databases]
 postgres = host=localhost port={{ postgresql_port }} auth_user=postgres
-{% for db in databases %}
-{{ db.name }} = host=localhost port={{ postgresql_port }} auth_user=postgres
+{% for name in databases %}
+{{ databases.name }} = host=localhost port={{ postgresql_port }} auth_user={{ databases.owner }}
 {% endfor %}
 
 [pgbouncer]
 listen_addr = 0.0.0.0
 listen_port = {{ pgbouncer_port }}
-auth_type = md5
+auth_type = {{ postgres_password_encryption_method }}
 auth_file = {{ pgbouncer_config_dir }}/userlist
 pool_mode = {{ pgbouncer_pool_mode }}
 max_client_conn = {{ pgbouncer_max_client_conn }}
@@ -18,3 +18,10 @@ log_dir = {{ pgbouncer_log_dir }}
 verbose = {{ pgbouncer_verbose }}
 server_idle_timeout = {{ pgbouncer_server_idle_timeout }}
 client_idle_timeout = {{ pgbouncer_client_idle_timeout }}
+{% if pgbouncer_ssl_enabled | default(false) %}
+server_tls_sslmode = require
+server_tls_cert_file = {{ pgbouncer_ssl_cert_path }}
+server_tls_key_file = {{ pgbouncer_ssl_key_path }}
+server_tls_ca_file = {{ pgbouncer_ssl_ca_path }}
+client_tls_sslmode = require
+{% endif %}
