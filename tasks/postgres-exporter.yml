@@ -37,14 +37,14 @@
     src: "/tmp/postgres_exporter.tar.gz"
     dest: "/tmp"
     remote_src: yes
-    creates: "/tmp/postgres_exporter-{{ postgres_exporter_version | default('0.15.0') }}.linux-amd64/postgres_exporter"
+    creates: "/tmp/postgres_exporter-{{ postgres_exporter_version | default('0.18.0') }}.linux-amd64/postgres_exporter"
   when: postgres_exporter_enabled | default(true)
   tags: postgres-exporter
 
 - name: Install PostgreSQL Exporter binary
   become: true
   copy:
-    src: "/tmp/postgres_exporter-{{ postgres_exporter_version | default('0.15.0') }}.linux-amd64/postgres_exporter"
+    src: "/tmp/postgres_exporter-{{ postgres_exporter_version | default('0.18.0') }}.linux-amd64/postgres_exporter"
     dest: "/usr/local/bin/postgres_exporter"
     owner: root
     group: root

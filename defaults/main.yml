@@ -167,7 +167,7 @@ postgres_exporter_enabled: true
 postgres_exporter_version: "0.18.0"
 postgres_exporter_port: 9187
 postgres_exporter_user: "postgres_exporter"
-postgres_exporter_password: "{{ vault_postgres_exporter_password }}"
+postgres_exporter_password: "exporter"
 postgres_exporter_system_user: "postgres-exporter"
 postgres_exporter_log_level: "info"
 
