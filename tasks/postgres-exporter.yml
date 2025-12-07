@@ -1,0 +1,165 @@
+---
+- name: Create PostgreSQL Exporter user in database
+  become: true
+  shell: |
+    {{ postgresql_base_command }} psql {{ postgresql_connection_params }} -c "
+    DO \$\$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{{ postgres_exporter_user }}') THEN
+        CREATE USER {{ postgres_exporter_user }} WITH PASSWORD '{{ postgres_exporter_password }}';
+      END IF;
+    END
+    \$\$;
+    
+    GRANT pg_monitor TO {{ postgres_exporter_user }};
+    GRANT CONNECT ON DATABASE postgres TO {{ postgres_exporter_user }};
+    "
+  delegate_to: "{{ primary_node_name }}"
+  run_once: true
+  when: 
+    - postgres_exporter_enabled | default(true)
+    - primary_node_name is defined
+  tags: postgres-exporter
+
+- name: Download PostgreSQL Exporter binary
+  become: true
+  get_url:
+    url: "https://github.com/prometheus-community/postgres_exporter/releases/download/v{{ postgres_exporter_version | default('0.18.0') }}/postgres_exporter-{{ postgres_exporter_version | default('0.18.0') }}.linux-amd64.tar.gz"
+    dest: "/tmp/postgres_exporter.tar.gz"
+    checksum: "sha256:{{ postgres_exporter_checksum | default('') }}"
+    timeout: 60
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Extract PostgreSQL Exporter
+  become: true
+  unarchive:
+    src: "/tmp/postgres_exporter.tar.gz"
+    dest: "/tmp"
+    remote_src: yes
+    creates: "/tmp/postgres_exporter-{{ postgres_exporter_version | default('0.15.0') }}.linux-amd64/postgres_exporter"
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Install PostgreSQL Exporter binary
+  become: true
+  copy:
+    src: "/tmp/postgres_exporter-{{ postgres_exporter_version | default('0.15.0') }}.linux-amd64/postgres_exporter"
+    dest: "/usr/local/bin/postgres_exporter"
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Create PostgreSQL Exporter system user
+  become: true
+  user:
+    name: "{{ postgres_exporter_system_user | default('postgres-exporter') }}"
+    system: yes
+    shell: /usr/sbin/nologin
+    home: /var/lib/{{ postgres_exporter_system_user | default('postgres-exporter') }}
+    create_home: no
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Create PostgreSQL Exporter configuration directory
+  become: true
+  file:
+    path: "/etc/postgres_exporter"
+    state: directory
+    owner: "{{ postgres_exporter_system_user | default('postgres-exporter') }}"
+    group: root
+    mode: '0755'
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Create PostgreSQL Exporter environment file
+  become: true
+  template:
+    src: postgres-exporter.env.j2
+    dest: "/etc/postgres_exporter/postgres_exporter.env"
+    owner: "{{ postgres_exporter_system_user | default('postgres-exporter') }}"
+    group: root
+    mode: '0640'
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Create PostgreSQL Exporter queries configuration
+  become: true
+  template:
+    src: postgres-exporter-queries.yaml.j2
+    dest: "/etc/postgres_exporter/queries.yaml"
+    owner: "{{ postgres_exporter_system_user | default('postgres-exporter') }}"
+    group: root
+    mode: '0644'
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Create PostgreSQL Exporter systemd service
+  become: true
+  template:
+    src: postgres-exporter.service.j2
+    dest: "/etc/systemd/system/postgres_exporter.service"
+    owner: root
+    group: root
+    mode: '0644'
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Reload systemd daemon
+  become: true
+  systemd:
+    daemon_reload: yes
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Enable and start PostgreSQL Exporter service
+  become: true
+  systemd:
+    name: postgres_exporter
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Wait for PostgreSQL Exporter to be ready
+  become: true
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ postgres_exporter_port | default(9187) }}"
+    timeout: 30
+    delay: 5
+    state: started
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Verify PostgreSQL Exporter metrics endpoint
+  become: true
+  uri:
+    url: "http://{{ ansible_host }}:{{ postgres_exporter_port | default(9187) }}/metrics"
+    method: GET
+    status_code: 200
+    timeout: 10
+  register: exporter_check
+  until: exporter_check.status == 200
+  retries: 5
+  delay: 5
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Show PostgreSQL Exporter status
+  become: true
+  systemd:
+    name: postgres_exporter
+  register: exporter_status
+  when: postgres_exporter_enabled | default(true)
+  tags: postgres-exporter
+
+- name: Debug PostgreSQL Exporter status
+  debug:
+    msg: "PostgreSQL Exporter is {{ exporter_status.status.ActiveState }} on {{ inventory_hostname }}"
+  when: postgres_exporter_enabled | default(true) and exporter_status is defined
+  tags: postgres-exporter

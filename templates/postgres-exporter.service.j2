@@ -1,0 +1,41 @@
+[Unit]
+Description=PostgreSQL Exporter
+Documentation=https://github.com/prometheus-community/postgres_exporter
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User={{ postgres_exporter_system_user | default('postgres-exporter') }}
+Group={{ postgres_exporter_system_user | default('postgres-exporter') }}
+EnvironmentFile=/etc/postgres_exporter/postgres_exporter.env
+ExecStart=/usr/local/bin/postgres_exporter \
+  --web.listen-address=:{{ postgres_exporter_port | default(9187) }} \
+  --extend.query-path=/etc/postgres_exporter/queries.yaml \
+  --log.level={{ postgres_exporter_log_level | default('info') }} \
+  {% if postgres_exporter_ssl_enabled | default(false) %}--web.tls-cert-file={{ postgres_exporter_ssl_cert_path }} \
+  --web.tls-key-file={{ postgres_exporter_ssl_key_path }}{% endif %}
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=postgres_exporter
+ProtectSystem=strict
+ReadWritePaths=/var/lib/postgres_exporter
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+MemoryDenyWriteExecute=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

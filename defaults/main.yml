@@ -161,3 +161,26 @@ pgbouncer_verbose: 0
 
 
 pgbouncer_connection_params: "-h localhost -U postgres -p {{ pgbouncer_port }} -w -d pgbouncer"
+
+# PostgreSQL Exporter settings
+postgres_exporter_enabled: true
+postgres_exporter_version: "0.18.0"
+postgres_exporter_port: 9187
+postgres_exporter_user: "postgres_exporter"
+postgres_exporter_password: "{{ vault_postgres_exporter_password }}"
+postgres_exporter_system_user: "postgres-exporter"
+postgres_exporter_log_level: "info"
+
+# SSL for PostgreSQL Exporter
+postgres_exporter_ssl_enabled: false
+postgres_exporter_ssl_cert_path: "/etc/ssl/certs/postgres-exporter.crt"
+postgres_exporter_ssl_key_path: "/etc/ssl/private/postgres-exporter.key"
+
+# Template for monitoring Patroni
+postgres_exporter_queries:
+  patroni:
+    query: "SELECT * FROM pg_is_in_recovery()"
+    metrics:
+      - pg_is_in_recovery:
+          usage: "GAUGE"
+          description: "Is PostgreSQL in recovery mode?"
