@@ -1,12 +1,15 @@
 [databases]
-postgres = host=localhost port={{ postgresql_port }} auth_user=postgres
-{% for name in databases %}
-{{ databases.name }} = host=localhost port={{ postgresql_port }} auth_user={{ databases.owner }}
+postgres = host={{ inventory_hostname }} port={{ haproxy_port }} auth_user=postgres
+{% for db in databases %}
+{{ db.name }} = host={{ inventory_hostname }} port={{ haproxy_port }}{% if postgres_password_encryption_method == 'md5' %} auth_user={{ db.owner }}{% endif %}
 {% endfor %}
 
 [pgbouncer]
 listen_addr = 0.0.0.0
 listen_port = {{ pgbouncer_port }}
+{% if postgres_password_encryption_method == scram-sha-256 %}
+auth_user = pgbouncer, postgres
+{% endif %}
 auth_type = {{ postgres_password_encryption_method }}
 auth_file = {{ pgbouncer_config_dir }}/userlist
 pool_mode = {{ pgbouncer_pool_mode }}

@@ -1,17 +1,41 @@
-- name: Create backup script
-  template:
-    src: backup-script.sh.j2
-    dest: "{{ postgres_backup_script_path }}/postgres-backup.sh"
-    owner: "postgres"
-    group: "postgres"
-    mode: '0750'
-  when: backup_enabled
+---
+- name: Setup backup infrastructure
+  become: true
+  block:
 
-- name: Configure cron job for backups
-  cron:
-    name: "PostgreSQL backup"
-    job: "{{ postgres_backup_script_path }}/postgres-backup.sh >> /var/log/postgres-backup.log 2>&1"
-    minute: "0"
-    hour: "2"
-    user: "postgres"
-  when: backup_enabled
+    - name: Create backup script
+      template:
+        src: backup.sh.j2
+        dest: "{{ postgres_backup_script_path }}/postgres-backup.sh"
+        owner: root
+        group: root
+        mode: '0755'
+      when: backup_enabled
+
+    - name: Create simple restore script
+      template:
+        src: restore.sh.j2
+        dest: "{{ postgres_backup_script_path }}/postgres-restore.sh"
+        owner: root
+        group: root
+        mode: '0755'
+      when: backup_enabled
+
+    - name: Add cron job for backups
+      cron:
+        name: "PostgreSQL backups (WAL-G + pg_dump)"
+        job: "{{ postgres_backup_script_path }}/postgres-backup.sh >> /var/log/postgres-backup.log 2>&1"
+        minute: "{{ backup_cron_minute | default('0') }}"
+        hour: "{{ backup_cron_hour | default('2') }}"
+        user: root
+      when: backup_enabled
+
+    - name: Test WAL-G installation
+      command: wal-g --version
+      register: walg_test
+      ignore_errors: true
+      changed_when: false
+
+    - name: Show WAL-G test result
+      debug:
+        msg: "WAL-G test: {{ 'SUCCESS' if walg_test.rc == 0 else 'FAILED - check S3 credentials' }}"

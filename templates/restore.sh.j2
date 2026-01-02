@@ -1,0 +1,155 @@
+#!/bin/bash
+
+# PostgreSQL restore script
+
+set -e
+
+CONTAINER="{{ patroni_cluster_name }}"
+BACKUP_DIR="{{ postgresql_backup_dir }}"
+WALG_ENV="{{ wal_g_dir }}/env"
+
+show_help() {
+    echo "Usage: $0 [command]"
+    echo ""
+    echo "Commands:"
+    echo "  list            - Show pg_dump backups"
+    echo "  walg-list       - Show WAL-G backups"
+    echo "  restore-latest  - Restore latest pg_dump"
+    echo "  restore-walg    - Restore from WAL-G"
+    echo ""
+    echo "Examples:"
+    echo "  $0 list"
+    echo "  $0 restore-latest"
+}
+
+list_backups() {
+    echo "Available pg_dump backups:"
+    echo "-------------------------"
+    ls -lh "$BACKUP_DIR"/full_dump_*.sql* 2>/dev/null || echo "No backups found"
+    echo ""
+}
+
+list_walg_backups() {
+    echo "Available WAL-G backups:"
+    echo "----------------------"
+    
+    if [ -f "$WALG_ENV" ]; then
+        set -a
+        source "$WALG_ENV"
+        set +a
+    fi
+    
+    docker exec "$CONTAINER" wal-g backup-list 2>/dev/null || echo "No WAL-G backups or S3 not configured"
+}
+
+restore_latest_dump() {
+    local latest_dump=$(ls -t "$BACKUP_DIR"/full_dump_*.sql* 2>/dev/null | head -1)
+    
+    if [ -z "$latest_dump" ]; then
+        echo "ERROR: No backups available"
+        exit 1
+    fi
+    
+    echo "Restoring from: $latest_dump"
+    echo "WARNING: This will OVERWRITE ALL database data!"
+    read -p "Type 'YES' to confirm: " confirm
+    
+    if [ "$confirm" != "YES" ]; then
+        echo "Cancelled"
+        exit 0
+    fi
+    
+    echo "Stopping Patroni..."
+    systemctl stop "{{ patroni_cluster_name }}" || true
+    sleep 5
+    
+    local temp_file="/tmp/restore_$(date +%s).sql"
+    
+    case "$latest_dump" in
+        *.gz)
+            gunzip -c "$latest_dump" > "$temp_file"
+            ;;
+        *.bz2)
+            bunzip2 -c "$latest_dump" > "$temp_file"
+            ;;
+        *)
+            cp "$latest_dump" "$temp_file"
+            ;;
+    esac
+    
+    echo "Restoring database..."
+    docker exec -i "$CONTAINER" psql -U postgres -h localhost < "$temp_file"
+    
+    rm -f "$temp_file"
+    
+    echo "Starting Patroni..."
+    systemctl start "{{ patroni_cluster_name }}"
+    
+    echo "Restoration completed!"
+}
+
+restore_from_walg() {
+    echo "WAL-G restoration..."
+    
+    if [ -f "$WALG_ENV" ]; then
+        set -a
+        source "$WALG_ENV"
+        set +a
+    fi
+    
+    echo "Available WAL-G backups:"
+    docker exec "$CONTAINER" wal-g backup-list
+    
+    read -p "Enter backup name (or leave empty for latest): " backup_name
+    
+    if [ -z "$backup_name" ]; then
+        backup_name="LATEST"
+    fi
+    
+    echo "WARNING: This will OVERWRITE ALL database data!"
+    read -p "Type 'YES' to confirm: " confirm
+    
+    if [ "$confirm" != "YES" ]; then
+        echo "Cancelled"
+        exit 0
+    fi
+    
+    echo "Stopping Patroni..."
+    systemctl stop "{{ patroni_cluster_name }}" || true
+    sleep 5
+    
+    echo "Restoring from WAL-G: $backup_name"
+    docker exec "$CONTAINER" sh -c "rm -rf /var/lib/postgresql/{{ postgresql_version }}/data/*"
+    docker exec "$CONTAINER" wal-g backup-fetch /var/lib/postgresql/{{ postgresql_version }}/data "$backup_name"
+    
+    docker exec "$CONTAINER" sh -c "touch /var/lib/postgresql/{{ postgresql_version }}/data/recovery.signal"
+    
+    echo "Starting Patroni..."
+    systemctl start "{{ patroni_cluster_name }}"
+    
+    echo "WAL-G restoration completed!"
+    echo "Check logs: journalctl -u {{ patroni_cluster_name }} -f"
+}
+
+case "${1:-help}" in
+    list)
+        list_backups
+        ;;
+    walg-list)
+        list_walg_backups
+        ;;
+    restore-latest)
+        restore_latest_dump
+        ;;
+    restore-walg)
+        restore_from_walg
+        ;;
+    help|--help|-h)
+        show_help
+        ;;
+    *)
+        echo "Unknown command: $1"
+        show_help
+        exit 1
+        ;;
+esac

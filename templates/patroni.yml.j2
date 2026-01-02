@@ -100,14 +100,30 @@ postgresql:
     checkpoint: fast
   
   wal_g:
-    command: /usr/local/bin/wal-g
-    env_dir: /etc/wal-g/env
+    command: "{{ wal_g_binary_path | default('/usr/local/bin/wal-g') }}"
+    env_dir: {{ wal_g_dir }}
 
   parameters:
     archive_mode: on
     archive_command: "wal-g wal-push %p"
     restore_command: "wal-g wal-fetch %f %p"
     archive_timeout: 300
+    max_wal_senders: 10
+    max_replication_slots: 10
+    hot_standby: on
+    wal_log_hints: on
+    wal_keep_size: 1GB
+    max_connections: 100
+    shared_buffers: 1GB
+    effective_cache_size: 2GB
+    maintenance_work_mem: 256MB
+    autovacuum_work_mem: 256MB
+    wal_buffers: 16MB
+    wal_writer_delay: 200ms
+    wal_level: replica
+    max_wal_senders: 10
+    wal_keep_size: 1GB
+    hot_standby: on
 {% if postgresql_ssl_enabled | default(false) %}
     ssl: on
     ssl_cert_file: '{{ postgresql_ssl_cert_file | default("server.crt") }}'

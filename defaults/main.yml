@@ -29,6 +29,7 @@ etcd_servers: "{% for host in groups['etcd_cluster'] %}{{ hostvars[host].ansible
 patroni_restapi_port: 8008
 postgresql_port: 5432
 pgbouncer_port: 6432
+haproxy_port: 7432
 
 # SSL for PostgreSQL
 postgresql_ssl_enabled: true
@@ -77,6 +78,21 @@ wal_g_delta_max_steps: 7
 wal_g_upload_concurrency: 4
 wal_g_download_concurrency: 4
 wal_g_upload_disk_concurrency: 2
+# Backup configuration
+backup_enabled: true
+backup_from_leader_only: true
+backup_retention_days: 7
+backup_minimum_count: 3
+create_pg_dump: false  # Set to true for additional pg_dump backups
+
+# Cron schedule
+backup_cron_minute: "0"
+backup_cron_hour: "2"
+
+# WAL-G settings 
+wal_g_binary_path: "/usr/local/bin/wal-g" # If "with_postgres_exporter: true" you may set link  "http://monitoring:9091/metrics/job/postgres_backup"
+# Monitoring
+backup_metrics_url: ""
 
 pgbouncer_auth_password: "pgbouncer_password"
 monitoring_password: "monitoring_password"
@@ -87,11 +103,11 @@ postgresql_parameters:
   work_mem: "4MB"
   maintenance_work_mem: "64MB"
   effective_cache_size: "1GB"
-  wal_level: "logical"
   max_wal_senders: "10"
   max_replication_slots: "10"
-  wal_keep_size: "1GB"
+  wal_keep_size: "500MB"
   wal_buffers: "16MB"
+  wal_level: hot_standby
   effective_io_concurrency: "200"
   min_wal_size: "1GB"
   max_wal_size: "2GB"
@@ -106,7 +122,6 @@ postgresql_parameters:
   lock_timeout: "30000"
   statement_timeout: "60000"
 
-backup_retention_days: 30
 backup_schedule: "0 2 * * *"
 
 # PostgreSQL base command

@@ -32,7 +32,7 @@
   when: flush_all != true and with_backup == true
   tags: backup
 
-- name: uninstall cluster
+- name: Uninstall cluster
   become: true
   ansible.builtin.import_tasks: uninstall.yml
   when: flush_all == true

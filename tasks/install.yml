@@ -126,7 +126,7 @@
 - name: Create WAL-G environment configuration
   template:
     src: wal-g-env.j2
-    dest: "{{ wal_g_dir }}/wal-g-env"
+    dest: "{{ wal_g_dir }}/env"
     owner: "{{ patroni_postgres_user }}"
     group: "{{ patroni_postgres_group }}"
     mode: '0640'

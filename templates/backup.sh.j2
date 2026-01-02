@@ -1,12 +1,90 @@
 #!/bin/bash
 
-DATE=$(date +%Y%m%d_%H%M%S)
+# PostgreSQL backup script for containerized Patroni
+# Uses WAL-G for incremental and pg_dump for full backups
+
+set -e
+
+CONTAINER="{{ patroni_cluster_name }}"
 BACKUP_DIR="{{ postgresql_backup_dir }}"
+DATE=$(date +%Y%m%d_%H%M%S)
+RETENTION_DAYS={{ backup_retention_days | default(7) }}
+WALG_ENV="{{ wal_g_dir }}/env"
 
-mkdir -p $BACKUP_DIR
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
 
-pg_dumpall -h localhost -U postgres -f $BACKUP_DIR/full_backup_$DATE.sql
+check_container() {
+    if ! docker ps --filter "name=$CONTAINER" --format "{{.Names}}" | grep -q "$CONTAINER"; then
+        log "ERROR: Container $CONTAINER not running"
+        return 1
+    fi
+    return 0
+}
 
-find $BACKUP_DIR -name "*.sql" -mtime +7 -delete
+create_walg_backup() {
+    log "Creating WAL-G base backup..."
+    
+    if [ -f "$WALG_ENV" ]; then
+        set -a
+        source "$WALG_ENV"
+        set +a
+    fi
+    
+    if docker exec "$CONTAINER" wal-g backup-push /var/lib/postgresql/{{ postgresql_version }}/data; then
+        log "WAL-G backup successful"
+        docker exec "$CONTAINER" wal-g delete --confirm retain-full {{ backup_minimum_count | default(3) }}
+        return 0
+    else
+        log "WARNING: WAL-G backup failed"
+        return 1
+    fi
+}
 
-echo "Backup completed: $BACKUP_DIR/full_backup_$DATE.sql"
+create_pgdump_backup() {
+    log "Creating pg_dumpall backup..."
+    
+    local dump_file="$BACKUP_DIR/full_dump_$DATE.sql"
+    
+    if docker exec "$CONTAINER" pg_dumpall -U postgres -h localhost > "$dump_file"; then
+        local size=$(du -h "$dump_file" | cut -f1)
+        log "pg_dump created: $dump_file ($size)"
+        
+        if command -v gzip >/dev/null 2>&1; then
+            gzip "$dump_file"
+            log "Backup compressed"
+        fi
+        
+        return 0
+    else
+        log "ERROR: pg_dump failed"
+        return 1
+    fi
+}
+
+cleanup_old_backups() {
+    log "Removing backups older than $RETENTION_DAYS days..."
+    find "$BACKUP_DIR" -name "full_dump_*.sql*" -mtime +$RETENTION_DAYS -delete
+    log "Cleanup completed"
+}
+
+main() {
+    log "=== Starting backup ==="
+    
+    if ! check_container; then
+        exit 1
+    fi
+    
+    mkdir -p "$BACKUP_DIR"
+    
+    # Try both backup methods
+    create_walg_backup || true
+    create_pgdump_backup
+    
+    cleanup_old_backups
+    
+    log "=== Backup completed ==="
+}
+
+main
