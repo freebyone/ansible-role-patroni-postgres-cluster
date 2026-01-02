@@ -104,3 +104,67 @@
     - create_db | bool
     - with_pgbouncer == true
     - primary_node_name is defined
+
+- name: Enable PostgreSQL extensions on primary node
+  block:
+    - name: Check if pg_stat_statements extension exists
+      shell: |
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} \
+          -c "SELECT 1 FROM pg_available_extensions WHERE name='pg_stat_statements';"
+      register: extension_check
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+      ignore_errors: true
+
+    - name: Create pg_stat_statements extension
+      shell: |
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} \
+          -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+      when: 
+        - extension_check is defined
+        - extension_check.rc == 0
+        - postgresql_extensions is defined
+        - "'pg_stat_statements' in postgresql_extensions | map(attribute='name') | list"
+      ignore_errors: true
+
+    - name: Configure pg_stat_statements for all databases
+      shell: |
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} \
+          -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';"
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+      when: 
+        - postgresql_extensions is defined
+        - "'pg_stat_statements' in postgresql_extensions | map(attribute='name') | list"
+      ignore_errors: true
+
+    - name: Reload PostgreSQL configuration
+      shell: |
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} \
+          -c "SELECT pg_reload_conf();"
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+      when: 
+        - postgresql_extensions is defined
+        - "'pg_stat_statements' in postgresql_extensions | map(attribute='name') | list"
+      ignore_errors: true
+
+    - name: Verify pg_stat_statements is working
+      shell: |
+        {{ postgresql_base_command }} psql {{ postgresql_connection_params }} \
+          -c "SELECT count(*) FROM pg_stat_statements;"
+      register: verify_extension
+      delegate_to: "{{ primary_node_name }}"
+      run_once: true
+      ignore_errors: true
+
+    - name: Show extension status
+      debug:
+        msg: "pg_stat_statements extension {{ 'enabled successfully' if verify_extension.rc == 0 else 'not enabled' }}"
+      when: verify_extension is defined
+
+  when: 
+    - primary_node_name is defined
+    - postgresql_extensions | default(false)

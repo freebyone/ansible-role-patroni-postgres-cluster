@@ -112,7 +112,6 @@ postgresql_parameters:
   min_wal_size: "1GB"
   max_wal_size: "2GB"
   max_prepared_transactions: "64"
-  shared_preload_libraries: "pg_stat_statements"
   default_statistics_target: "100"
   superuser_reserved_connections: "3"
   tcp_keepalives_idle: "60"
@@ -121,6 +120,15 @@ postgresql_parameters:
   idle_in_transaction_session_timeout: "60000"
   lock_timeout: "30000"
   statement_timeout: "60000"
+  shared_preload_libraries: "pg_stat_statements"
+  pg_stat_statements.max: "10000"
+  pg_stat_statements.track: "all"
+  pg_stat_statements.track_utility: "on"
+  pg_stat_statements.save: "on"
+  
+
+available_extensions:
+  - pg_stat_statements
 
 backup_schedule: "0 2 * * *"
 
@@ -191,11 +199,7 @@ postgres_exporter_ssl_enabled: false
 postgres_exporter_ssl_cert_path: "/etc/ssl/certs/postgres-exporter.crt"
 postgres_exporter_ssl_key_path: "/etc/ssl/private/postgres-exporter.key"
 
-# Template for monitoring Patroni
-postgres_exporter_queries:
-  patroni:
-    query: "SELECT * FROM pg_is_in_recovery()"
-    metrics:
-      - pg_is_in_recovery:
-          usage: "GAUGE"
-          description: "Is PostgreSQL in recovery mode?"
+# PostgreSQL Extensions
+postgresql_extensions:
+  - name: pg_stat_statements
+    enabled: true
